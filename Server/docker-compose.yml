@@ -8,5 +8,8 @@ services:
       NODE_ENV: "production"
     networks:
       - megagera_network
-    depends_on:
-      - megaqueue
+
+networks:
+  megagera_network:
+    external: true
+
