@@ -9,5 +9,4 @@ services:
     networks:
       - megagera_network
     depends_on:
-      - megalog_db
       - megaqueue
