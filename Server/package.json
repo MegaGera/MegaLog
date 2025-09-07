@@ -1,0 +1,20 @@
+{
+  "name": "megalog_server",
+  "version": "0.0.1",
+  "description": "MegaLog consumer service for processing user action logs from MegaQueue",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "start:dev": "NODE_ENV=development supervisor index.js",
+    "start:prod": "NODE_ENV=production supervisor index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "MegaGera",
+  "license": "ISC",
+  "dependencies": {
+    "amqplib": "^0.10.3",
+    "dotenv": "^16.4.5",
+    "mongodb": "^6.3.0"
+  }
+} 

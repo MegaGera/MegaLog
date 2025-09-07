@@ -1,0 +1,13 @@
+services:
+  megalog_server:
+    image: megalog_server
+    container_name: megalog_server
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: "production"
+    networks:
+      - megagera_network
+    depends_on:
+      - megalog_db
+      - megaqueue
