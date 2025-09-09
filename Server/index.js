@@ -1,37 +1,89 @@
 /* 
   MegaLog Server
   Consumes user action logs from MegaQueue and stores them in MongoDB
+  Provides REST API for log retrieval
 */
 import './config/loadEnv.js';
+import express from 'express';
+import cors from 'cors';
 import { connectDB } from './config/db.js';
-import { connectRabbitMQ, closeConnection } from './config/rabbitmq.js';
+import { connectRabbitMQ, closeConnection, isRabbitMQConnected } from './config/rabbitmq.js';
 import LogProcessor from './services/logProcessor.js';
+import logsRouter from './routes/logs.js';
+import statsRouter from './routes/stats.js';
 
 console.log('🚀 Starting MegaLog Server...');
 console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+
+// Initialize Express app
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+console.log('🌐 CORS Origin:', process.env.CORS_ORIGIN);
+// Middleware
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5713',
+  credentials: true
+}));
+app.use(express.json());
+
+// API Routes
+app.use('/api/logs', logsRouter);
+app.use('/api/stats', statsRouter);
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    service: 'MegaLog Server',
+    rabbitmqConnected: isRabbitMQConnected()
+  });
+});
 
 // Initialize services
 const logProcessor = new LogProcessor();
 
 const startApplication = async () => {
   try {
-    // Connect to MongoDB
+    // Connect to MongoDB (this is critical - fail if unavailable)
     console.log('📊 Connecting to MongoDB...');
     await connectDB();
     
-    // Connect to RabbitMQ
+    // Try to connect to RabbitMQ (non-critical - continue if unavailable)
     console.log('🐰 Connecting to MegaQueue...');
-    await connectRabbitMQ();
+    const rabbitmqConnected = await connectRabbitMQ();
     
-    // Initialize log processor
+    if (!rabbitmqConnected) {
+      console.log('⚠️  MegaQueue unavailable - server will continue without message processing');
+      console.log('🔄 Will attempt reconnection every 30 seconds...');
+    }
+    
+    // Initialize log processor (this will work even without RabbitMQ)
     console.log('⚙️  Initializing LogProcessor...');
     await logProcessor.initialize();
     
-    // Start consuming messages
-    console.log('🔄 Starting message consumption...');
-    await logProcessor.startConsuming();
+    // Start consuming messages (only if RabbitMQ is available)
+    if (rabbitmqConnected) {
+      console.log('🔄 Starting message consumption...');
+      await logProcessor.startConsuming();
+    }
     
-    console.log('✅ MegaLog Server is running and processing logs!');
+    // Start Express server
+    console.log(`🌐 Starting HTTP server on port ${PORT}...`);
+    const server = app.listen(PORT, () => {
+      console.log(`✅ HTTP API server is running on port ${PORT}`);
+    });
+    
+    // Store server reference for graceful shutdown
+    app.locals.server = server;
+    
+    console.log('✅ MegaLog Server is running!');
+    if (rabbitmqConnected) {
+      console.log('🔄 Processing logs from MegaQueue');
+    } else {
+      console.log('📊 API endpoints available (RabbitMQ will reconnect automatically)');
+    }
     console.log('Press Ctrl+C to stop the server');
     
     // Show stats every 300 seconds (5 minutes) in development
@@ -39,7 +91,8 @@ const startApplication = async () => {
       setInterval(async () => {
         const stats = await logProcessor.getStats();
         if (stats) {
-          console.log(`📈 Stats - Total: ${stats.totalLogs}, Last 24h: ${stats.logsLast24h}`);
+          const rabbitStatus = stats.rabbitmqConnected ? '🟢 Connected' : '🔴 Disconnected';
+          console.log(`📈 Stats - Total: ${stats.totalLogs}, Last 24h: ${stats.logsLast24h}, RabbitMQ: ${rabbitStatus}`);
         }
       }, 300000); // 5 minutes
     }
@@ -57,6 +110,14 @@ const gracefulShutdown = async (signal) => {
   try {
     // Stop processing new messages
     await logProcessor.stop();
+    
+    // Close HTTP server
+    if (app.locals.server) {
+      await new Promise((resolve) => {
+        app.locals.server.close(resolve);
+      });
+      console.log('🌐 HTTP server closed');
+    }
     
     // Close RabbitMQ connection
     await closeConnection();
