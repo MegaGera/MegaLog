@@ -6,6 +6,7 @@
 import './config/loadEnv.js';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { connectDB } from './config/db.js';
 import { connectRabbitMQ, closeConnection, isRabbitMQConnected } from './config/rabbitmq.js';
 import LogProcessor from './services/logProcessor.js';
@@ -19,13 +20,58 @@ console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-console.log('🌐 CORS Origin:', process.env.CORS_ORIGIN);
 // Middleware
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5713',
-  credentials: true
-}));
 app.use(express.json());
+app.use(cookieParser());
+
+// CORS configuration
+if (process.env.NODE_ENV === 'production') {
+  console.log("Production mode - cors")
+  const allowedOrigins = [/\.?megagera\.com$/];
+
+  const corsOptions = {
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.some((regex) => regex.test(origin))) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    }, 
+    credentials: true
+  };
+
+  app.use(cors(corsOptions));
+} else {
+  app.use(cors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5713',
+    credentials: true
+  }));
+}
+
+// Validate Api Key
+if (process.env.NODE_ENV === 'production') {
+  const validateApiKey = async (req, res, next) => {
+    try {
+      const headers = new Headers({
+        Cookie: "access_token=" + req.cookies.access_token
+      });
+      const validateRequest = new Request(process.env.VALIDATE_URI, {
+        headers: headers,
+      });
+      const validateResponse = await fetch(validateRequest);
+      const validateData = await validateResponse.json();
+      req.validateData = validateData.data;
+      if (validateResponse.status === 200) {
+        next();
+      } else {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    } catch (error) {
+      return res.status(401).json({ error: 'Can\'t validate token' });
+    }
+  };
+  app.use(validateApiKey)
+}
 
 // API Routes
 app.use('/api/logs', logsRouter);
