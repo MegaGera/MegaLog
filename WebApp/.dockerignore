@@ -1,0 +1,12 @@
+node_modules
+.git
+.gitignore
+README.md
+.env.local
+dist
+coverage
+.nyc_output
+.cache
+.vscode
+.DS_Store
+*.log 

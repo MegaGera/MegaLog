@@ -1,0 +1,14 @@
+services:
+  megalog_webapp:
+    image: megalog_webapp
+    container_name: megalog_webapp
+    build: .
+    restart: unless-stopped
+    ports:
+      - "80"
+    networks:
+      - megagera_network
+
+networks:
+  megagera_network:
+    external: true 
