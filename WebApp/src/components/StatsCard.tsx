@@ -34,17 +34,17 @@ export const StatsCard: React.FC<StatsCardProps> = ({ stats }) => {
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center">
-          <div className={`p-2 rounded-lg ${stats.isProcessing ? 'bg-green-100' : 'bg-red-100'}`}>
-            <Server className={`w-6 h-6 ${stats.isProcessing ? 'text-green-600' : 'text-red-600'}`} />
+          <div className={`p-2 rounded-lg ${stats.rabbitmqConnected ? 'bg-green-100' : 'bg-red-100'}`}>
+            <Server className={`w-6 h-6 ${stats.rabbitmqConnected ? 'text-green-600' : 'text-red-600'}`} />
           </div>
           <div className="ml-4">
-            <p className="text-sm font-medium text-gray-500">Status</p>
-            <p className={`text-lg font-semibold ${stats.isProcessing ? 'text-green-600' : 'text-red-600'}`}>
-              {stats.isProcessing ? 'Processing' : 'Stopped'}
+            <p className="text-sm font-medium text-gray-500">Queue Status</p>
+            <p className={`text-lg font-semibold ${stats.rabbitmqConnected ? 'text-green-600' : 'text-red-600'}`}>
+              {stats.rabbitmqConnected ? 'Connected' : 'Disconnected'}
             </p>
           </div>
         </div>
       </div>
     </div>
   );
-}; 
+};

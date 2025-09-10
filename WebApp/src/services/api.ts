@@ -14,24 +14,33 @@ const api = axios.create({
 });
 
 export const logsApi = {
-  // Get all logs with pagination
-  getLogs: async (page: number = 1, limit: number = 20): Promise<LogsResponse> => {
+  // Get all logs with pagination and filtering
+  getLogs: async (page: number = 1, limit: number = 50, filters?: {
+    service?: string;
+    username?: string;
+    action?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<LogsResponse> => {
     const response = await api.get<LogsResponse>('/logs', {
-      params: { page, limit }
+      params: { page, limit, ...filters }
     });
     return response.data;
   },
 
-  // Get logs grouped by service
+  // Get logs grouped by service (now using the new stats endpoint)
   getLogsByService: async (): Promise<ServiceGroup[]> => {
-    const response = await api.get<ServiceGroup[]>('/logs/by-service');
+    const response = await api.get<ServiceGroup[]>('/stats/services');
     return response.data;
   },
 
   // Get logs for a specific service
-  getServiceLogs: async (service: string, page: number = 1, limit: number = 20): Promise<LogsResponse> => {
+  getServiceLogs: async (service: string, page: number = 1, limit: number = 50, filters?: {
+    startDate?: string;
+    endDate?: string;
+  }): Promise<LogsResponse> => {
     const response = await api.get<LogsResponse>(`/logs/service/${encodeURIComponent(service)}`, {
-      params: { page, limit }
+      params: { page, limit, ...filters }
     });
     return response.data;
   },
@@ -42,13 +51,56 @@ export const logsApi = {
     return response.data;
   },
 
-  // Search logs
-  searchLogs: async (query: string, page: number = 1, limit: number = 20): Promise<LogsResponse> => {
-    const response = await api.get<LogsResponse>('/logs/search', {
-      params: { q: query, page, limit }
+  // Get filter options
+  getFilterOptions: async (): Promise<{
+    services: string[];
+    usernames: string[];
+    actions: string[];
+  }> => {
+    const response = await api.get<{
+      services: string[];
+      usernames: string[];
+      actions: string[];
+    }>('/logs/filters');
+    return response.data;
+  },
+
+  // Search logs (now using the main logs endpoint with filters)
+  searchLogs: async (query: string, page: number = 1, limit: number = 50): Promise<LogsResponse> => {
+    // Use the main logs endpoint with service filter for search
+    const response = await api.get<LogsResponse>('/logs', {
+      params: { 
+        page, 
+        limit, 
+        service: query // Simple search by service name
+      }
     });
     return response.data;
-  }
+  },
+
+  // Get distinct usernames for a specific service
+  getServiceUsernames: async (service: string): Promise<{ usernames: string[] }> => {
+    const response = await api.get<{ usernames: string[] }>(`/logs/service/${encodeURIComponent(service)}/usernames`);
+    return response.data;
+  },
+
+  // Get distinct actions for a specific service
+  getServiceActions: async (service: string): Promise<{ actions: string[] }> => {
+    const response = await api.get<{ actions: string[] }>(`/logs/service/${encodeURIComponent(service)}/actions`);
+    return response.data;
+  },
+
+  // Get all distinct usernames (prepared for future use)
+  getAllUsernames: async (): Promise<{ usernames: string[] }> => {
+    const response = await api.get<{ usernames: string[] }>('/logs/usernames');
+    return response.data;
+  },
+
+  // Get all distinct actions (prepared for future use)
+  getAllActions: async (): Promise<{ actions: string[] }> => {
+    const response = await api.get<{ actions: string[] }>('/logs/actions');
+    return response.data;
+  },
 };
 
-export default api; 
+export default api;

@@ -2,7 +2,7 @@ export interface Log {
   _id: string;
   timestamp: string;
   service: string;
-  microservice: string;
+  microservice?: string;
   username: string;
   action: string;
   details?: Record<string, unknown>;
@@ -19,20 +19,24 @@ export interface Log {
 
 export interface LogsResponse {
   logs: Log[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
 }
 
 export interface ServiceGroup {
   service: string;
-  logs: Log[];
-  count: number;
+  totalCount: number;
+  last24HoursCount: number;
+  latestLog: Log | null;
 }
 
 export interface LogsStats {
   totalLogs: number;
   logsLast24h: number;
   isProcessing: boolean;
-} 
+  rabbitmqConnected: boolean;
+}
