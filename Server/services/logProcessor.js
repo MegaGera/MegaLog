@@ -26,10 +26,15 @@ class LogProcessor {
       // Create a new log entry using the Mongoose model
       const log = new Log({
         timestamp: new Date(logData.timestamp),
-        action: logData.action,
-        username: logData.username,
         service: logData.service,
-        // Add any other fields from logData
+        microservice: logData.microservice,
+        username: logData.username,
+        action: logData.action,
+        details: logData.details,
+        metadata: logData.metadata,
+        processed_at: new Date(),
+        message_id: message.properties.messageId,
+        delivery_tag: message.fields.deliveryTag
       });
 
       // Save the log to MongoDB
