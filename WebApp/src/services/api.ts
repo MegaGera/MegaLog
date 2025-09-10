@@ -2,10 +2,15 @@ import axios from 'axios';
 import type { LogsResponse, LogsStats, ServiceGroup } from '../types/log';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const IS_PRODUCTION = import.meta.env.PROD;
 
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: IS_PRODUCTION, // Send cookies in production
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
 export const logsApi = {
