@@ -1,32 +1,50 @@
 import express from 'express';
-import { getDB } from '../config/db.js';
+import Log from '../models/log.js';
 
 const router = express.Router();
 
-// Get all logs with pagination
+// Get logs with pagination and filtering
 router.get('/', async (req, res) => {
   try {
-    const db = getDB();
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
+    
+    // Build filter object from query parameters
+    const filter = {};
+    if (req.query.service) filter.service = req.query.service;
+    if (req.query.username) filter.username = req.query.username;
+    if (req.query.action) filter.action = req.query.action;
+    
+    // Date range filter
+    if (req.query.startDate || req.query.endDate) {
+      filter.timestamp = {};
+      if (req.query.startDate) {
+        filter.timestamp.$gte = new Date(req.query.startDate);
+      }
+      if (req.query.endDate) {
+        filter.timestamp.$lte = new Date(req.query.endDate);
+      }
+    }
 
+    // Execute queries in parallel
     const [logs, total] = await Promise.all([
-      db.collection('user_logs')
-        .find({})
-        .sort({ processed_at: -1 })
+      Log.find(filter)
+        .sort({ timestamp: -1 })
         .skip(skip)
         .limit(limit)
-        .toArray(),
-      db.collection('user_logs').countDocuments()
+        .lean(),
+      Log.countDocuments(filter)
     ]);
 
     res.json({
       logs,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
     console.error('Error fetching logs:', error);
@@ -34,63 +52,63 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get logs grouped by service
-router.get('/by-service', async (req, res) => {
+// Get unique values for filters
+router.get('/filters', async (req, res) => {
   try {
-    const db = getDB();
-    
-    const pipeline = [
-      {
-        $group: {
-          _id: '$service',
-          logs: { $push: '$$ROOT' },
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          _id: 0,
-          service: '$_id',
-          logs: { $slice: ['$logs', 10] }, // Limit to 10 logs per service for preview
-          count: 1
-        }
-      },
-      { $sort: { count: -1 } }
-    ];
+    const [services, usernames, actions] = await Promise.all([
+      Log.distinct('service'),
+      Log.distinct('username'),
+      Log.distinct('action')
+    ]);
 
-    const serviceGroups = await db.collection('user_logs').aggregate(pipeline).toArray();
-    res.json(serviceGroups);
+    res.json({
+      services: services.sort(),
+      usernames: usernames.sort(),
+      actions: actions.sort()
+    });
   } catch (error) {
-    console.error('Error fetching services:', error);
-    res.status(500).json({ error: 'Failed to fetch services' });
+    console.error('Error fetching filter options:', error);
+    res.status(500).json({ error: 'Failed to fetch filter options' });
   }
 });
 
 // Get logs for a specific service
 router.get('/service/:service', async (req, res) => {
   try {
-    const db = getDB();
-    const service = decodeURIComponent(req.params.service);
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
+    const limit = parseInt(req.query.limit) || 50;
     const skip = (page - 1) * limit;
+    
+    const filter = { service: req.params.service };
+    
+    // Add date range filter if provided
+    if (req.query.startDate || req.query.endDate) {
+      filter.timestamp = {};
+      if (req.query.startDate) {
+        filter.timestamp.$gte = new Date(req.query.startDate);
+      }
+      if (req.query.endDate) {
+        filter.timestamp.$lte = new Date(req.query.endDate);
+      }
+    }
 
     const [logs, total] = await Promise.all([
-      db.collection('user_logs')
-        .find({ service })
-        .sort({ processed_at: -1 })
+      Log.find(filter)
+        .sort({ timestamp: -1 })
         .skip(skip)
         .limit(limit)
-        .toArray(),
-      db.collection('user_logs').countDocuments({ service })
+        .lean(),
+      Log.countDocuments(filter)
     ]);
 
     res.json({
       logs,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
     console.error('Error fetching service logs:', error);
@@ -98,48 +116,47 @@ router.get('/service/:service', async (req, res) => {
   }
 });
 
-// Search logs
-router.get('/search', async (req, res) => {
+// Get distinct usernames for a specific service
+router.get('/service/:service/usernames', async (req, res) => {
   try {
-    const db = getDB();
-    const query = req.query.q;
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 20;
-    const skip = (page - 1) * limit;
-
-    if (!query) {
-      return res.status(400).json({ error: 'Search query is required' });
-    }
-
-    const searchFilter = {
-      $or: [
-        { username: { $regex: query, $options: 'i' } },
-        { action: { $regex: query, $options: 'i' } },
-        { service: { $regex: query, $options: 'i' } },
-        { microservice: { $regex: query, $options: 'i' } }
-      ]
-    };
-
-    const [logs, total] = await Promise.all([
-      db.collection('user_logs')
-        .find(searchFilter)
-        .sort({ processed_at: -1 })
-        .skip(skip)
-        .limit(limit)
-        .toArray(),
-      db.collection('user_logs').countDocuments(searchFilter)
-    ]);
-
-    res.json({
-      logs,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit)
-    });
+    const usernames = await Log.distinct('username', { service: req.params.service });
+    res.json({ usernames: usernames.sort() });
   } catch (error) {
-    console.error('Error searching logs:', error);
-    res.status(500).json({ error: 'Failed to search logs' });
+    console.error('Error fetching service usernames:', error);
+    res.status(500).json({ error: 'Failed to fetch service usernames' });
+  }
+});
+
+// Get distinct actions for a specific service
+router.get('/service/:service/actions', async (req, res) => {
+  try {
+    const actions = await Log.distinct('action', { service: req.params.service });
+    res.json({ actions: actions.sort() });
+  } catch (error) {
+    console.error('Error fetching service actions:', error);
+    res.status(500).json({ error: 'Failed to fetch service actions' });
+  }
+});
+
+// Get all distinct usernames (prepared for future use)
+router.get('/usernames', async (req, res) => {
+  try {
+    const usernames = await Log.distinct('username');
+    res.json({ usernames: usernames.sort() });
+  } catch (error) {
+    console.error('Error fetching all usernames:', error);
+    res.status(500).json({ error: 'Failed to fetch usernames' });
+  }
+});
+
+// Get all distinct actions (prepared for future use)
+router.get('/actions', async (req, res) => {
+  try {
+    const actions = await Log.distinct('action');
+    res.json({ actions: actions.sort() });
+  } catch (error) {
+    console.error('Error fetching all actions:', error);
+    res.status(500).json({ error: 'Failed to fetch actions' });
   }
 });
 

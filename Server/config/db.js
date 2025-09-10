@@ -1,56 +1,39 @@
-import { MongoClient } from 'mongodb';
+import mongoose from 'mongoose';
 
-let db = null;
+let isConnected = false;
 
-const connectDB = async () => {
+export const connectDB = async () => {
+  if (isConnected) {
+    console.log('📊 MongoDB is already connected');
+    return;
+  }
+
   try {
-    const client = new MongoClient(process.env.MONGO_URI);
-    await client.connect();
-    
-    db = client.db(process.env.DB_NAME);
-    console.log('Connected to MegaLog MongoDB successfully');
-    
-    // Create indexes for better performance
-    await createIndexes();
-    
+    await mongoose.connect(process.env.MONGO_URI, {
+      dbName: process.env.DB_NAME
+    });
+
+    isConnected = true;
+    console.log('📊 MongoDB connected successfully');
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error('❌ MongoDB connection error:', error);
     process.exit(1);
   }
 };
 
-const createIndexes = async () => {
+export const disconnectDB = async () => {
+  if (!isConnected) {
+    return;
+  }
+
   try {
-    // Index on timestamp for chronological queries
-    await db.collection('user_logs').createIndex({ timestamp: -1 });
-    
-    // Index on username for user-specific queries
-    await db.collection('user_logs').createIndex({ username: 1 });
-    
-    // Index on service for service-specific queries
-    await db.collection('user_logs').createIndex({ service: 1 });
-    
-    // Index on action for action-specific queries
-    await db.collection('user_logs').createIndex({ action: 1 });
-    
-    // Compound index for common query patterns
-    await db.collection('user_logs').createIndex({ 
-      service: 1, 
-      username: 1, 
-      timestamp: -1 
-    });
-    
-    console.log('Database indexes created successfully');
+    await mongoose.disconnect();
+    isConnected = false;
+    console.log('📊 MongoDB disconnected successfully');
   } catch (error) {
-    console.error('Error creating indexes:', error);
+    console.error('❌ Error disconnecting from MongoDB:', error);
+    process.exit(1);
   }
 };
 
-const getDB = () => {
-  if (!db) {
-    throw new Error('Database not connected');
-  }
-  return db;
-};
-
-export { connectDB, getDB }; 
+export const getConnection = () => mongoose.connection;

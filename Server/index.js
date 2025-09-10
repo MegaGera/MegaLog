@@ -8,7 +8,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { connectDB } from './config/db.js';
-import { connectRabbitMQ, closeConnection, isRabbitMQConnected } from './config/rabbitmq.js';
+import { connect, closeConnection, isRabbitMQConnected } from './config/rabbitmq.js';
 import LogProcessor from './services/logProcessor.js';
 import logsRouter from './routes/logs.js';
 import statsRouter from './routes/stats.js';
@@ -98,7 +98,8 @@ const startApplication = async () => {
     
     // Try to connect to RabbitMQ (non-critical - continue if unavailable)
     console.log('🐰 Connecting to MegaQueue...');
-    const rabbitmqConnected = await connectRabbitMQ();
+    const rabbitmqChannel = await connect();
+    const rabbitmqConnected = rabbitmqChannel !== null;
     
     if (!rabbitmqConnected) {
       console.log('⚠️  MegaQueue unavailable - server will continue without message processing');

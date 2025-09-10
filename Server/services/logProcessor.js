@@ -1,177 +1,107 @@
-import { getDB } from '../config/db.js';
-import { getChannel, isRabbitMQConnected } from '../config/rabbitmq.js';
+import { getConnection } from '../config/db.js';
+import Log from '../models/log.js';
+import { connect, consume } from '../config/rabbitmq.js';
 
 class LogProcessor {
   constructor() {
-    this.db = null;
     this.channel = null;
+    this.queue = process.env.QUEUE_NAME || 'logging';
     this.isProcessing = false;
-    this.consumerTag = null;
   }
 
   async initialize() {
     try {
-      this.db = getDB();
-      
-      // Try to get RabbitMQ channel, but don't fail if it's not available
-      this.channel = getChannel();
-      
-      if (this.channel) {
-        console.log('✅ LogProcessor initialized with RabbitMQ connection');
-      } else {
-        console.log('⚠️  LogProcessor initialized without RabbitMQ (will retry when available)');
-      }
-      
-      // Set up global reconnection handler
-      global.logProcessorReconnect = () => {
-        this.handleRabbitMQReconnection();
-      };
-      
+      // RabbitMQ connection will be handled by the connect() function
+      console.log('LogProcessor initialized');
     } catch (error) {
-      console.error('❌ Failed to initialize LogProcessor:', error);
+      console.error('Failed to initialize LogProcessor:', error);
       throw error;
     }
   }
 
-  async handleRabbitMQReconnection() {
-    console.log('🔄 RabbitMQ reconnected, updating LogProcessor...');
-    
-    this.channel = getChannel();
-    
-    if (this.channel && !this.isProcessing) {
-      console.log('🚀 Starting message consumption after reconnection...');
-      await this.startConsuming();
+  async processMessage(message) {
+    try {
+      const logData = JSON.parse(message.content.toString());
+      
+      // Create a new log entry using the Mongoose model
+      const log = new Log({
+        timestamp: new Date(logData.timestamp),
+        action: logData.action,
+        username: logData.username,
+        service: logData.service,
+        // Add any other fields from logData
+      });
+
+      // Save the log to MongoDB
+      await log.save();
+      
+      console.log(`✅ Processed log: ${logData.action} by ${logData.username} in ${logData.service}`);
+      
+      return true;
+    } catch (error) {
+      console.error('Error processing message:', error);
+      return false;
     }
   }
 
   async startConsuming() {
-    if (!isRabbitMQConnected() || !this.channel) {
-      console.log('⚠️  RabbitMQ not available, skipping message consumption');
-      return false;
-    }
-
-    if (this.isProcessing) {
-      console.warn('⚠️  LogProcessor is already consuming messages');
-      return true;
-    }
-
     try {
+      this.channel = await connect();
+      if (!this.channel) {
+        throw new Error('No RabbitMQ channel available');
+      }
+
+      await consume(this.channel, this.queue, this.processMessage.bind(this));
       this.isProcessing = true;
       
-      const result = await this.channel.consume('logging', async (msg) => {
-        if (msg !== null) {
-          await this.processMessage(msg);
-        }
-      });
-      
-      this.consumerTag = result.consumerTag;
-      
-      console.log('✅ LogProcessor started consuming from logging queue');
-      return true;
+      console.log(`🔄 Started consuming messages from queue: ${this.queue}`);
     } catch (error) {
-      console.error('❌ Error starting message consumption:', error);
+      console.error('Failed to start consuming messages:', error);
       this.isProcessing = false;
-      this.channel = null; // Reset channel on error
-      return false;
+      throw error;
     }
   }
 
-  async processMessage(msg) {
+  async stop() {
     try {
-      // Check if we still have a valid channel
-      if (!this.channel || !isRabbitMQConnected()) {
-        console.warn('⚠️  Lost RabbitMQ connection during message processing');
-        this.isProcessing = false;
-        return;
+      if (this.channel) {
+        await this.channel.close();
+        this.channel = null;
       }
-
-      // Parse the message
-      const logData = JSON.parse(msg.content.toString());
-
-      // Add processing metadata
-      const enrichedLog = {
-        ...logData,
-        processed_at: new Date().toISOString(),
-        message_id: msg.properties.messageId || null,
-        delivery_tag: msg.fields.deliveryTag
-      };
-
-      // Store in MongoDB
-      await this.storeLog(enrichedLog);
-      
-      // Acknowledge message
-      this.channel.ack(msg);
-      
-      console.log(`📝 Log processed: ${logData.username} - ${logData.action}`);
-      
+      this.isProcessing = false;
+      console.log('🛑 Stopped consuming messages');
     } catch (error) {
-      console.error('❌ Error processing message:', error);
-      console.error('Message content:', msg.content.toString());
-      
-      // Only try to nack if we still have a channel
-      if (this.channel && isRabbitMQConnected()) {
-        try {
-          // Reject message and don't requeue to prevent infinite loops
-          this.channel.nack(msg, false, false);
-        } catch (nackError) {
-          console.error('❌ Error nacking message:', nackError);
-        }
-      }
-    }
-  }
-
-  async storeLog(logData) {
-    try {
-      const result = await this.db.collection('user_logs').insertOne(logData);
-      
-      if (!result.insertedId) {
-        throw new Error('Failed to insert log into database');
-      }
-      
-      return result.insertedId;
-    } catch (error) {
-      console.error('❌ Database insertion error:', error);
+      console.error('Error stopping consumer:', error);
       throw error;
     }
   }
 
   async getStats() {
     try {
-      const totalLogs = await this.db.collection('user_logs').countDocuments();
-      const recentLogs = await this.db.collection('user_logs').countDocuments({
-        processed_at: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-      });
-      
+      const connection = getConnection();
+      if (!connection || connection.readyState !== 1) {
+        return null;
+      }
+
+      const now = new Date();
+      const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+      const [totalLogs, logsLast24h] = await Promise.all([
+        Log.countDocuments(),
+        Log.countDocuments({
+          timestamp: { $gte: twentyFourHoursAgo }
+        })
+      ]);
+
       return {
         totalLogs,
-        logsLast24h: recentLogs,
+        logsLast24h,
         isProcessing: this.isProcessing,
-        rabbitmqConnected: isRabbitMQConnected()
+        rabbitmqConnected: this.channel !== null
       };
     } catch (error) {
-      console.error('❌ Error getting stats:', error);
+      console.error('Error getting stats:', error);
       return null;
-    }
-  }
-
-  async stop() {
-    console.log('🛑 Stopping LogProcessor...');
-    
-    try {
-      if (this.consumerTag && this.channel && isRabbitMQConnected()) {
-        await this.channel.cancel(this.consumerTag);
-        console.log('✅ Consumer cancelled');
-      }
-    } catch (error) {
-      console.error('❌ Error cancelling consumer:', error);
-    }
-    
-    this.isProcessing = false;
-    this.consumerTag = null;
-    
-    // Clear global reconnection handler
-    if (global.logProcessorReconnect) {
-      delete global.logProcessorReconnect;
     }
   }
 }
