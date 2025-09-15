@@ -31,10 +31,9 @@ interface DailyData {
 interface DailyUsersChartProps {
   data: DailyData[];
   loading?: boolean;
-  period?: '7d' | '30d' | '3m';
 }
 
-export function DailyUsersChart({ data, loading = false, period = '7d' }: DailyUsersChartProps) {
+export function DailyUsersChart({ data, loading = false }: DailyUsersChartProps) {
   // Format dates for display (show day of week and date)
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);

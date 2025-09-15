@@ -358,17 +358,14 @@ export function Service() {
 
               {/* Total Logs Chart */}
               <DailyLogsChart 
-                data={dailyData} 
-                serviceName={serviceName || ''} 
+                data={dailyData}
                 loading={chartLoading}
-                period={selectedPeriod}
               />
               
               {/* Distinct Users Chart */}
               <DailyUsersChart 
                 data={dailyUsersData} 
                 loading={usersChartLoading}
-                period={selectedPeriod}
               />
             </div>
           </div>

@@ -30,12 +30,10 @@ interface DailyData {
 
 interface DailyLogsChartProps {
   data: DailyData[];
-  serviceName: string;
   loading?: boolean;
-  period?: '7d' | '30d' | '3m';
 }
 
-export function DailyLogsChart({ data, loading = false, period = '7d' }: DailyLogsChartProps) {
+export function DailyLogsChart({ data, loading = false }: DailyLogsChartProps) {
   // Format dates for display (show day of week and date)
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
