@@ -31,6 +31,8 @@ export interface ServiceGroup {
   service: string;
   totalCount: number;
   last24HoursCount: number;
+  users24HoursCount: number;
+  users30DaysCount: number;
   latestLog: Log | null;
 }
 

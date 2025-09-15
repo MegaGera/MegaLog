@@ -41,7 +41,7 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ serviceGroup, onServic
       <div className="space-y-4">
         <div>
           <h4 className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Activity Stats</h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-lg font-semibold text-gray-900">{serviceGroup.totalCount}</div>
               <div className="text-xs text-gray-500">Total Logs</div>
@@ -49,6 +49,14 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ serviceGroup, onServic
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="text-lg font-semibold text-gray-900">{serviceGroup.last24HoursCount}</div>
               <div className="text-xs text-gray-500">Last 24 Hours</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-lg font-semibold text-gray-900">{serviceGroup.users24HoursCount}</div>
+              <div className="text-xs text-gray-500">Last 24 Hours Users</div>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-lg font-semibold text-gray-900">{serviceGroup.users30DaysCount}</div>
+              <div className="text-xs text-gray-500">Last 30 Days Users</div>
             </div>
           </div>
         </div>
