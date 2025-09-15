@@ -92,4 +92,130 @@ router.get('/services', async (req, res) => {
   }
 });
 
+// Get daily logs data for a specific service
+router.get('/services/:serviceName/daily', async (req, res) => {
+  try {
+    const { serviceName } = req.params;
+    const { period = '7d' } = req.query; // Default to 7 days
+    const now = new Date();
+    
+    // Calculate days based on period
+    let daysToShow;
+    switch (period) {
+      case '7d':
+        daysToShow = 7;
+        break;
+      case '30d':
+        daysToShow = 30;
+        break;
+      case '3m':
+        daysToShow = 90; // 3 months ≈ 90 days
+        break;
+      default:
+        daysToShow = 7;
+    }
+    
+    // Generate array of days
+    const days = [];
+    for (let i = daysToShow - 1; i >= 0; i--) {
+      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+      
+      days.push({
+        date: startOfDay.toISOString().split('T')[0], // YYYY-MM-DD format
+        startOfDay,
+        endOfDay
+      });
+    }
+    
+    // Get logs count for each day
+    const dailyData = await Promise.all(days.map(async (day) => {
+      const count = await Log.countDocuments({
+        service: serviceName,
+        timestamp: {
+          $gte: day.startOfDay,
+          $lt: day.endOfDay
+        }
+      });
+      
+      return {
+        date: day.date,
+        count
+      };
+    }));
+    
+    res.json({
+      service: serviceName,
+      dailyData
+    });
+  } catch (error) {
+    console.error('Error fetching daily logs data:', error);
+    res.status(500).json({ error: 'Failed to fetch daily logs data' });
+  }
+});
+
+// Get daily distinct users data for a specific service
+router.get('/services/:serviceName/daily-users', async (req, res) => {
+  try {
+    const { serviceName } = req.params;
+    const { period = '7d' } = req.query; // Default to 7 days
+    const now = new Date();
+    
+    // Calculate days based on period
+    let daysToShow;
+    switch (period) {
+      case '7d':
+        daysToShow = 7;
+        break;
+      case '30d':
+        daysToShow = 30;
+        break;
+      case '3m':
+        daysToShow = 90; // 3 months ≈ 90 days
+        break;
+      default:
+        daysToShow = 7;
+    }
+    
+    // Generate array of days
+    const days = [];
+    for (let i = daysToShow - 1; i >= 0; i--) {
+      const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+      
+      days.push({
+        date: startOfDay.toISOString().split('T')[0], // YYYY-MM-DD format
+        startOfDay,
+        endOfDay
+      });
+    }
+    
+    // Get distinct users count for each day
+    const dailyData = await Promise.all(days.map(async (day) => {
+      const distinctUsers = await Log.distinct('username', {
+        service: serviceName,
+        timestamp: {
+          $gte: day.startOfDay,
+          $lt: day.endOfDay
+        }
+      });
+      
+      return {
+        date: day.date,
+        count: distinctUsers.length
+      };
+    }));
+    
+    res.json({
+      service: serviceName,
+      dailyData
+    });
+  } catch (error) {
+    console.error('Error fetching daily users data:', error);
+    res.status(500).json({ error: 'Failed to fetch daily users data' });
+  }
+});
+
 export default router;

@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { logsApi } from '../services/api';
 import { LogCard } from './LogCard';
+import { DailyLogsChart } from './DailyLogsChart';
+import { DailyUsersChart } from './DailyUsersChart';
 import { getDisplayServiceName } from '../utils/serviceNames';
 import type { LogsResponse } from '../types/log';
 
@@ -24,15 +26,13 @@ export function Service() {
   const [filtersLoading, setFiltersLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [limit] = useState(50);
+  const [dailyData, setDailyData] = useState<Array<{ date: string; count: number }>>([]);
+  const [dailyUsersData, setDailyUsersData] = useState<Array<{ date: string; count: number }>>([]);
+  const [chartLoading, setChartLoading] = useState(false);
+  const [usersChartLoading, setUsersChartLoading] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<'7d' | '30d' | '3m'>('7d');
 
-  useEffect(() => {
-    if (serviceName) {
-      loadServiceLogs();
-      loadFilterOptions();
-    }
-  }, [serviceName, currentPage, selectedUsername, selectedAction]);
-
-  const loadServiceLogs = async () => {
+  const loadServiceLogs = useCallback(async () => {
     if (!serviceName) return;
     
     try {
@@ -55,9 +55,9 @@ export function Service() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [serviceName, currentPage, selectedUsername, selectedAction, limit]);
 
-  const loadFilterOptions = async () => {
+  const loadFilterOptions = useCallback(async () => {
     if (!serviceName) return;
     
     try {
@@ -74,10 +74,55 @@ export function Service() {
     } finally {
       setFiltersLoading(false);
     }
+  }, [serviceName]);
+
+  const loadDailyData = useCallback(async () => {
+    if (!serviceName) return;
+    
+    try {
+      setChartLoading(true);
+      const data = await logsApi.getServiceDailyData(serviceName, selectedPeriod);
+      setDailyData(data.dailyData);
+    } catch (err) {
+      console.error('Failed to load daily data:', err);
+    } finally {
+      setChartLoading(false);
+    }
+  }, [serviceName, selectedPeriod]);
+
+  const loadDailyUsersData = useCallback(async () => {
+    if (!serviceName) return;
+    
+    try {
+      setUsersChartLoading(true);
+      const data = await logsApi.getServiceDailyUsersData(serviceName, selectedPeriod);
+      setDailyUsersData(data.dailyData);
+    } catch (err) {
+      console.error('Failed to load daily users data:', err);
+    } finally {
+      setUsersChartLoading(false);
+    }
+  }, [serviceName, selectedPeriod]);
+
+  const handlePeriodChange = (period: '7d' | '30d' | '3m') => {
+    setSelectedPeriod(period);
   };
 
+  useEffect(() => {
+    if (serviceName) {
+      loadServiceLogs();
+      loadFilterOptions();
+      loadDailyData();
+      loadDailyUsersData();
+    }
+  }, [serviceName, currentPage, selectedUsername, selectedAction, selectedPeriod, loadServiceLogs, loadFilterOptions, loadDailyData, loadDailyUsersData]);
+
   const handleRefresh = async () => {
-    await loadServiceLogs();
+    await Promise.all([
+      loadServiceLogs(),
+      loadDailyData(),
+      loadDailyUsersData()
+    ]);
   };
 
   const handleUsernameChange = (username: string) => {
@@ -199,73 +244,133 @@ export function Service() {
         )}
 
         {serviceLogs && !loading && (
-          <div>
-            {/* Pagination Info */}
-            <div className="mb-6 flex justify-between items-center">
-              <p className="text-gray-600">
-                Showing {serviceLogs.logs.length} of {serviceLogs.pagination.total} logs
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Logs List - 6 columns */}
+            <div className="lg:col-span-6">
+              {/* Pagination Info */}
+              <div className="mb-6 flex justify-between items-center">
+                <p className="text-gray-600">
+                  Showing {serviceLogs.logs.length} of {serviceLogs.pagination.total} logs
+                  {serviceLogs.pagination.pages > 1 && (
+                    <span className="ml-2 text-sm text-gray-500">
+                      (Page {serviceLogs.pagination.page} of {serviceLogs.pagination.pages})
+                    </span>
+                  )}
+                </p>
+                
+                {/* Pagination Controls */}
                 {serviceLogs.pagination.pages > 1 && (
-                  <span className="ml-2 text-sm text-gray-500">
-                    (Page {serviceLogs.pagination.page} of {serviceLogs.pagination.pages})
-                  </span>
-                )}
-              </p>
-              
-              {/* Pagination Controls */}
-              {serviceLogs.pagination.pages > 1 && (
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage <= 1}
-                    className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                    Previous
-                  </button>
-                  
-                  <div className="flex items-center space-x-1">
-                    {Array.from({ length: Math.min(5, serviceLogs.pagination.pages) }, (_, i) => {
-                      const pageNum = Math.max(1, Math.min(serviceLogs.pagination.pages, currentPage - 2 + i));
-                      return (
-                        <button
-                          key={pageNum}
-                          onClick={() => handlePageChange(pageNum)}
-                          className={`px-3 py-2 text-sm border rounded-md ${
-                            currentPage === pageNum
-                              ? 'bg-gray-800 text-white border-gray-800'
-                              : 'border-gray-300 hover:bg-gray-50'
-                          }`}
-                        >
-                          {pageNum}
-                        </button>
-                      );
-                    })}
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage <= 1}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Previous
+                    </button>
+                    
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(5, serviceLogs.pagination.pages) }, (_, i) => {
+                        const pageNum = Math.max(1, Math.min(serviceLogs.pagination.pages, currentPage - 2 + i));
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            className={`px-3 py-2 text-sm border rounded-md ${
+                              currentPage === pageNum
+                                ? 'bg-gray-800 text-white border-gray-800'
+                                : 'border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage >= serviceLogs.pagination.pages}
+                      className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
-                  
-                  <button
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={currentPage >= serviceLogs.pagination.pages}
-                    className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                  >
-                    Next
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                )}
+              </div>
+              
+              {/* Logs List */}
+              <div className="space-y-4">
+                {serviceLogs.logs.map((log) => (
+                  <LogCard key={log._id} log={log} />
+                ))}
+              </div>
+              
+              {serviceLogs.logs.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No logs found for this service.</p>
                 </div>
               )}
             </div>
-            
-            {/* Logs List */}
-            <div className="space-y-4">
-              {serviceLogs.logs.map((log) => (
-                <LogCard key={log._id} log={log} />
-              ))}
-            </div>
-            
-            {serviceLogs.logs.length === 0 && (
-              <div className="text-center py-12">
-                <p className="text-gray-500">No logs found for this service.</p>
+
+            {/* Charts - 6 columns */}
+            <div className="lg:col-span-6 space-y-6">
+              {/* Timeline Selection */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900">Analytics Timeline</h3>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handlePeriodChange('7d')}
+                      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        selectedPeriod === '7d'
+                          ? 'bg-blue-600 text-blue-600'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                      }`}
+                    >
+                      7 Days
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('30d')}
+                      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        selectedPeriod === '30d'
+                          ? 'bg-blue-600 text-blue-600'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                      }`}
+                    >
+                      30 Days
+                    </button>
+                    <button
+                      onClick={() => handlePeriodChange('3m')}
+                      className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                        selectedPeriod === '3m'
+                          ? 'bg-blue-600 text-blue-600'
+                          : 'bg-gray-100 text-black hover:bg-gray-200'
+                      }`}
+                    >
+                      3 Months
+                    </button>
+                  </div>
+                </div>
               </div>
-            )}
+
+              {/* Total Logs Chart */}
+              <DailyLogsChart 
+                data={dailyData} 
+                serviceName={serviceName || ''} 
+                loading={chartLoading}
+                period={selectedPeriod}
+              />
+              
+              {/* Distinct Users Chart */}
+              <DailyUsersChart 
+                data={dailyUsersData} 
+                loading={usersChartLoading}
+                period={selectedPeriod}
+              />
+            </div>
           </div>
         )}
       </main>

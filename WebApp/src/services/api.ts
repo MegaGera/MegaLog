@@ -101,6 +101,46 @@ export const logsApi = {
     const response = await api.get<{ actions: string[] }>('/logs/actions');
     return response.data;
   },
+
+  // Get daily logs data for a specific service
+  getServiceDailyData: async (serviceName: string, period: '7d' | '30d' | '3m' = '7d'): Promise<{
+    service: string;
+    dailyData: Array<{
+      date: string;
+      count: number;
+    }>;
+  }> => {
+    const response = await api.get<{
+      service: string;
+      dailyData: Array<{
+        date: string;
+        count: number;
+      }>;
+    }>(`/stats/services/${encodeURIComponent(serviceName)}/daily`, {
+      params: { period }
+    });
+    return response.data;
+  },
+
+  // Get daily distinct users data for a specific service
+  getServiceDailyUsersData: async (serviceName: string, period: '7d' | '30d' | '3m' = '7d'): Promise<{
+    service: string;
+    dailyData: Array<{
+      date: string;
+      count: number;
+    }>;
+  }> => {
+    const response = await api.get<{
+      service: string;
+      dailyData: Array<{
+        date: string;
+        count: number;
+      }>;
+    }>(`/stats/services/${encodeURIComponent(serviceName)}/daily-users`, {
+      params: { period }
+    });
+    return response.data;
+  },
 };
 
 export default api;
