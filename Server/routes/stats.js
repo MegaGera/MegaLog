@@ -45,17 +45,26 @@ router.get('/services', async (req, res) => {
   try {
     const now = new Date();
     const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Get all unique services
     const services = await Log.distinct('service');
     
     // For each service, get the required stats
     const serviceStats = await Promise.all(services.map(async (service) => {
-      const [totalCount, last24HoursCount, latestLog] = await Promise.all([
+      const [totalCount, last24HoursCount, distinctUsersLast24h, distinctUsersLast30d, latestLog] = await Promise.all([
         Log.countDocuments({ service }),
         Log.countDocuments({ 
           service,
           timestamp: { $gte: twentyFourHoursAgo }
+        }),
+        Log.distinct('username', {
+          service,
+          timestamp: { $gte: twentyFourHoursAgo }
+        }),
+        Log.distinct('username', {
+          service,
+          timestamp: { $gte: thirtyDaysAgo }
         }),
         Log.findOne({ service })
           .sort({ timestamp: -1 })
@@ -67,6 +76,8 @@ router.get('/services', async (req, res) => {
         service,
         totalCount,
         last24HoursCount,
+        users24HoursCount: distinctUsersLast24h.length,
+        users30DaysCount: distinctUsersLast30d.length,
         latestLog: latestLog ? {
           ...latestLog,
           timestamp: toISOString(latestLog.timestamp)
