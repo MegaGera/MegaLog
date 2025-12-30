@@ -4,9 +4,10 @@ import type { Log } from '../types/log';
 
 interface LogCardProps {
   log: Log;
+  extense: boolean;
 }
 
-export const LogCard: React.FC<LogCardProps> = ({ log }) => {
+export const LogCard: React.FC<LogCardProps> = ({ log, extense }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const formatTimestamp = (timestamp: string) => {
@@ -80,16 +81,18 @@ export const LogCard: React.FC<LogCardProps> = ({ log }) => {
           </div>
 
           {/* Service and Microservice */}
-          <div className="flex items-center space-x-2 min-w-0">
-            <Activity className="w-4 h-4 text-gray-500 flex-shrink-0" />
-            <span className="font-medium text-gray-900 truncate">{log.service}</span>
-            {log.microservice && (
-              <>
-                <span className="text-gray-400">•</span>
-                <span className="text-gray-600 truncate">{log.microservice}</span>
-              </>
-            )}
-          </div>
+          {extense &&
+            <div className="flex items-center space-x-2 min-w-0">
+              <Activity className="w-4 h-4 text-gray-500 flex-shrink-0" />
+              <span className="font-medium text-gray-900 truncate">{log.service}</span>
+              {log.microservice && (
+                <>
+                  <span className="text-gray-400">•</span>
+                  <span className="text-gray-600 truncate">{log.microservice}</span>
+                </>
+              )}
+            </div>
+          }
 
           {/* Username */}
           <div className="flex items-center space-x-1 min-w-0">

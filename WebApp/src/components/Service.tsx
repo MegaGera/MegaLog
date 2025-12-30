@@ -163,28 +163,28 @@ export function Service() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 py-4 sm:py-6">
+            <div className="flex items-center space-x-3 sm:space-x-4 min-w-0">
               <button
                 onClick={handleBackToServices}
-                className="flex items-center text-gray-700 hover:text-gray-900 font-medium"
+                className="flex items-center text-gray-700 hover:text-gray-900 font-medium flex-shrink-0"
               >
-                <ArrowLeft className="w-5 h-5 mr-2" />
-                Back to Services
+                <ArrowLeft className="w-5 h-5 sm:mr-2" />
+                <span className="hidden sm:inline">Back to Services</span>
               </button>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 truncate">
                 {serviceName ? getDisplayServiceName(serviceName) : 'Service'}
               </h1>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center sm:flex-shrink-0">
               <button
                 onClick={handleRefresh}
                 disabled={loading}
-                className="flex items-center space-x-2 px-4 py-2 bg-gray-800 text-black rounded-md hover:bg-gray-900 disabled:opacity-50 shadow-md font-semibold border border-gray-700"
+                className="flex items-center space-x-2 px-3 sm:px-4 py-2 bg-gray-800 text-black rounded-md hover:bg-gray-900 disabled:opacity-50 shadow-md font-semibold border border-gray-700 w-full sm:w-auto justify-center sm:justify-start"
               >
                 <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
+                <span className="hidden sm:inline">Refresh</span>
               </button>
             </div>
           </div>
@@ -304,7 +304,7 @@ export function Service() {
               {/* Logs List */}
               <div className="space-y-4">
                 {serviceLogs.logs.map((log) => (
-                  <LogCard key={log._id} log={log} />
+                  <LogCard key={log._id} log={log} extense={false} />
                 ))}
               </div>
               
