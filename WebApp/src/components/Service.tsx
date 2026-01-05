@@ -199,9 +199,9 @@ export function Service() {
 
         {/* Filter Bar - No Background */}
         <div className="mb-6">
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-row gap-2 sm:gap-3">
             {/* Username Filter */}
-            <div className="w-full sm:w-48">
+            <div className="flex-1 sm:w-48">
               <select
                 value={selectedUsername}
                 onChange={(e) => handleUsernameChange(e.target.value)}
@@ -218,7 +218,7 @@ export function Service() {
             </div>
 
             {/* Action Filter */}
-            <div className="w-full sm:w-48">
+            <div className="flex-1 sm:w-48">
               <select
                 value={selectedAction}
                 onChange={(e) => handleActionChange(e.target.value)}
@@ -301,7 +301,7 @@ export function Service() {
               </div>
               
               {/* Logs List */}
-              <div className="space-y-4">
+              <div className="space-y-2">
                 {serviceLogs.logs.map((log) => (
                   <LogCard key={log._id} log={log} extense={false} />
                 ))}

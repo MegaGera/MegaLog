@@ -63,12 +63,12 @@ export const LogCard: React.FC<LogCardProps> = ({ log, extense }) => {
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
       {/* Compact row view */}
       <div 
-        className="flex items-center justify-between p-3 cursor-pointer"
+        className="flex items-start md:items-center justify-between py-2 px-3 cursor-pointer"
         onClick={() => hasExpandableContent() && setIsExpanded(!isExpanded)}
       >
-        <div className="flex items-center space-x-4 flex-1 min-w-0">
+        <div className="flex items-start md:items-center flex-wrap md:flex-nowrap gap-2 md:gap-4 flex-1 min-w-0">
           {/* Expand arrow */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 pt-0.5 md:pt-0">
             {hasExpandableContent() ? (
               isExpanded ? (
                 <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -94,22 +94,25 @@ export const LogCard: React.FC<LogCardProps> = ({ log, extense }) => {
             </div>
           }
 
-          {/* Username */}
-          <div className="flex items-center space-x-1 min-w-0">
-            <User className="w-4 h-4 text-gray-500 flex-shrink-0" />
-            <span className="text-gray-700 truncate">{log.username}</span>
-          </div>
+          {/* Username and Timestamp - Stacked on mobile, inline on larger screens */}
+          <div className="flex flex-col md:flex-row md:items-center gap-1 md:gap-4 min-w-0 flex-1">
+            {/* Username */}
+            <div className="flex items-center space-x-1 min-w-0">
+              <User className="w-4 h-4 text-gray-500 flex-shrink-0" />
+              <span className="text-gray-700 truncate">{log.username}</span>
+            </div>
 
-          {/* Timestamp */}
-          <div className="flex items-center space-x-1 min-w-0">
-            <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" />
-            <span className="text-gray-600 text-sm truncate">{formatTimestamp(log.timestamp)}</span>
+            {/* Timestamp */}
+            <div className="flex items-center space-x-1 min-w-0">
+              <Calendar className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+              <span className="text-gray-600 text-xs truncate">{formatTimestamp(log.timestamp)}</span>
+            </div>
           </div>
         </div>
 
         {/* Action badge */}
-        <div className="flex-shrink-0 ml-4">
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${getActionColor(log.action)}`}>
+        <div className="flex-shrink-0 ml-2 md:ml-4 pt-0.5 md:pt-0">
+          <span className={`px-1.5 md:px-2 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-medium ${getActionColor(log.action)}`}>
             {log.action}
           </span>
         </div>
