@@ -247,8 +247,8 @@ export function Service() {
             {/* Logs List - 6 columns */}
             <div className="lg:col-span-6">
               {/* Pagination Info */}
-              <div className="mb-6 flex justify-between items-center">
-                <p className="text-gray-600">
+              <div className="mb-6 flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+                <p className="text-gray-600 text-sm md:text-base">
                   Showing {serviceLogs.logs.length} of {serviceLogs.pagination.total} logs
                   {serviceLogs.pagination.pages > 1 && (
                     <span className="ml-2 text-sm text-gray-500">
@@ -259,24 +259,25 @@ export function Service() {
                 
                 {/* Pagination Controls */}
                 {serviceLogs.pagination.pages > 1 && (
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center justify-center md:justify-end flex-wrap gap-1.5 md:gap-2">
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage <= 1}
-                      className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
-                      <ChevronLeft className="w-4 h-4" />
-                      Previous
+                      <ChevronLeft className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                      <span className="hidden sm:inline">Previous</span>
+                      <span className="sm:hidden">Prev</span>
                     </button>
                     
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center space-x-0.5 md:space-x-1">
                       {Array.from({ length: Math.min(5, serviceLogs.pagination.pages) }, (_, i) => {
                         const pageNum = Math.max(1, Math.min(serviceLogs.pagination.pages, currentPage - 2 + i));
                         return (
                           <button
                             key={pageNum}
                             onClick={() => handlePageChange(pageNum)}
-                            className={`px-3 py-2 text-sm border rounded-md ${
+                            className={`px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border rounded-md ${
                               currentPage === pageNum
                                 ? 'bg-gray-800 text-white border-gray-800'
                                 : 'border-gray-300 hover:bg-gray-50'
@@ -291,10 +292,10 @@ export function Service() {
                     <button
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage >= serviceLogs.pagination.pages}
-                      className="px-3 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                      className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
                     >
                       Next
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4" />
                     </button>
                   </div>
                 )}
