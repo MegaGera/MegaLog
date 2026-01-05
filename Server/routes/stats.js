@@ -19,18 +19,31 @@ const toISOString = (timestamp) => {
 router.get('/', async (req, res) => {
   try {
     const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Get today's start (midnight UTC)
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    
+    // Get yesterday's start (midnight UTC)
+    const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayEnd = new Date(todayStart);
 
-    const [totalLogs, logsLast24h] = await Promise.all([
+    const [totalLogs, logsToday, logsYesterday] = await Promise.all([
       Log.countDocuments(),
       Log.countDocuments({
-        timestamp: { $gte: twentyFourHoursAgo }
+        timestamp: { $gte: todayStart }
+      }),
+      Log.countDocuments({
+        timestamp: { 
+          $gte: yesterdayStart,
+          $lt: yesterdayEnd
+        }
       })
     ]);
 
     res.json({
       totalLogs,
-      logsLast24h,
+      logsToday,
+      logsYesterday,
       isProcessing: isRabbitMQConnected(),
       rabbitmqConnected: isRabbitMQConnected()
     });

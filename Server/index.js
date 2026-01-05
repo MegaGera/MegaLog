@@ -139,7 +139,7 @@ const startApplication = async () => {
         const stats = await logProcessor.getStats();
         if (stats) {
           const rabbitStatus = stats.rabbitmqConnected ? '🟢 Connected' : '🔴 Disconnected';
-          console.log(`📈 Stats - Total: ${stats.totalLogs}, Last 24h: ${stats.logsLast24h}, RabbitMQ: ${rabbitStatus}`);
+          console.log(`📈 Stats - Total: ${stats.totalLogs}, Today: ${stats.logsToday}, Yesterday: ${stats.logsYesterday}, RabbitMQ: ${rabbitStatus}`);
         }
       }, 300000); // 5 minutes
     }

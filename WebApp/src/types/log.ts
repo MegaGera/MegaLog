@@ -38,7 +38,8 @@ export interface ServiceGroup {
 
 export interface LogsStats {
   totalLogs: number;
-  logsLast24h: number;
+  logsToday: number;
+  logsYesterday: number;
   isProcessing: boolean;
   rabbitmqConnected: boolean;
 }
