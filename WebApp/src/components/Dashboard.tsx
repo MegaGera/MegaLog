@@ -62,8 +62,8 @@ export function Dashboard() {
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-4">
-              <h1 className="text-3xl font-bold text-gray-900">
-                MegaLog Dashboard
+              <h1 className="font-semibold text-gray-800 tracking-tight">
+                MegaLog
               </h1>
             </div>
             
