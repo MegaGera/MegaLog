@@ -57,7 +57,14 @@ router.get('/', async (req, res) => {
 router.get('/services', async (req, res) => {
   try {
     const now = new Date();
-    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    
+    // Get today's start (midnight UTC)
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+    
+    // Get yesterday's start and end (midnight UTC)
+    const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayEnd = new Date(todayStart);
+    
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     // Get all unique services
@@ -65,15 +72,29 @@ router.get('/services', async (req, res) => {
     
     // For each service, get the required stats
     const serviceStats = await Promise.all(services.map(async (service) => {
-      const [totalCount, last24HoursCount, distinctUsersLast24h, distinctUsersLast30d, latestLog] = await Promise.all([
+      const [totalCount, todayCount, yesterdayCount, distinctUsersToday, distinctUsersYesterday, distinctUsersLast30d, latestLog] = await Promise.all([
         Log.countDocuments({ service }),
         Log.countDocuments({ 
           service,
-          timestamp: { $gte: twentyFourHoursAgo }
+          timestamp: { $gte: todayStart }
+        }),
+        Log.countDocuments({
+          service,
+          timestamp: { 
+            $gte: yesterdayStart,
+            $lt: yesterdayEnd
+          }
         }),
         Log.distinct('username', {
           service,
-          timestamp: { $gte: twentyFourHoursAgo }
+          timestamp: { $gte: todayStart }
+        }),
+        Log.distinct('username', {
+          service,
+          timestamp: { 
+            $gte: yesterdayStart,
+            $lt: yesterdayEnd
+          }
         }),
         Log.distinct('username', {
           service,
@@ -88,8 +109,10 @@ router.get('/services', async (req, res) => {
       return {
         service,
         totalCount,
-        last24HoursCount,
-        users24HoursCount: distinctUsersLast24h.length,
+        todayCount,
+        yesterdayCount,
+        todayUsersCount: distinctUsersToday.length,
+        yesterdayUsersCount: distinctUsersYesterday.length,
         users30DaysCount: distinctUsersLast30d.length,
         latestLog: latestLog ? {
           ...latestLog,

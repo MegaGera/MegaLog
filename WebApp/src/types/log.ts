@@ -30,8 +30,10 @@ export interface LogsResponse {
 export interface ServiceGroup {
   service: string;
   totalCount: number;
-  last24HoursCount: number;
-  users24HoursCount: number;
+  todayCount: number;
+  yesterdayCount: number;
+  todayUsersCount: number;
+  yesterdayUsersCount: number;
   users30DaysCount: number;
   latestLog: Log | null;
 }
