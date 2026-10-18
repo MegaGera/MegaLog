@@ -66,7 +66,7 @@ export const logsApi = {
       matchesCreated: number;
     };
   }> => {
-    const response = await api.post('/jobs/daily-resume', null, { timeout: 60000 });
+    const response = await api.post('/jobs/daily-resume', {}, { timeout: 60000 });
     return response.data;
   },
 
