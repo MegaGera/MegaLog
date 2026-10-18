@@ -45,6 +45,35 @@ const pageNameFromLog = (log) => {
   return 'unknown';
 };
 
+const formatMatchLabel = (details = {}) => {
+  const home = details.teams?.home?.name || details.homeTeam;
+  const away = details.teams?.away?.name || details.awayTeam;
+  if (home && away) {
+    const league = details.league?.name || details.leagueName;
+    return league ? `${home} vs ${away} (${league})` : `${home} vs ${away}`;
+  }
+  if (details.fixtureId) return `Fixture ${details.fixtureId}`;
+  if (details.matchId) return `Match ${details.matchId}`;
+  return 'Unknown match';
+};
+
+const matchKeyFromDetails = (details = {}) => {
+  if (details.fixtureId != null) return `fixture:${details.fixtureId}`;
+  if (details.fixture?.id != null) return `fixture:${details.fixture.id}`;
+  if (details.matchId != null) return `match:${details.matchId}`;
+  return `label:${formatMatchLabel(details)}`;
+};
+
+const bumpNamedCount = (map, key, name) => {
+  if (!key) return;
+  const existing = map.get(key);
+  if (existing) {
+    existing.count += 1;
+  } else {
+    map.set(key, { name: name || key, count: 1 });
+  }
+};
+
 export const getResumeWindow = (now = new Date()) => {
   const to = now;
   const from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -67,7 +96,26 @@ export const buildDailyResumeStats = async (now = new Date()) => {
 
   const registers = authLogs.filter((log) => log.action === 'USER_REGISTER');
   const logins = authLogs.filter((log) => log.action === 'USER_LOGIN');
-  const loginUsernames = new Set(logins.map((log) => log.username).filter(Boolean));
+
+  const emailByUsername = new Map();
+  for (const log of registers) {
+    if (log.username && log.details?.email) {
+      emailByUsername.set(log.username, log.details.email);
+    }
+  }
+
+  const authUserMap = new Map();
+  for (const log of authLogs) {
+    if (!log.username) continue;
+    if (!authUserMap.has(log.username)) {
+      authUserMap.set(log.username, {
+        username: log.username,
+        ...(emailByUsername.get(log.username)
+          ? { email: emailByUsername.get(log.username) }
+          : {})
+      });
+    }
+  }
 
   const megaauth = {
     newUsersCount: registers.length,
@@ -78,7 +126,10 @@ export const buildDailyResumeStats = async (now = new Date()) => {
     loginsTotal: logins.length,
     loginsNormal: logins.filter((log) => log.details?.loginType === 'normal').length,
     loginsTest: logins.filter((log) => log.details?.loginType === 'test').length,
-    distinctLoginUsers: loginUsernames.size,
+    distinctLoginUsers: new Set(logins.map((log) => log.username).filter(Boolean)).size,
+    distinctUsers: [...authUserMap.values()].sort((a, b) =>
+      String(a.username).localeCompare(String(b.username))
+    ),
     passwordChanged: authLogs.filter((log) => log.action === 'PASSWORD_CHANGED').length,
     passwordReset: authLogs.filter((log) => log.action === 'PASSWORD_RESET').length,
     testUsersCreated: authLogs.filter((log) => log.action === 'TEST_USER_CREATED').length
@@ -95,10 +146,20 @@ export const buildDailyResumeStats = async (now = new Date()) => {
     usersByTimestamp.get(log.username).push(new Date(log.timestamp).getTime());
   }
 
-  let sessions = 0;
-  for (const timestamps of usersByTimestamp.values()) {
-    sessions += countSessions(timestamps);
-  }
+  const users = [...usersByTimestamp.entries()]
+    .map(([username, timestamps]) => ({
+      username,
+      sessions: countSessions(timestamps)
+    }))
+    .sort((a, b) => b.sessions - a.sessions || a.username.localeCompare(b.username));
+
+  const sessions = users.reduce((sum, user) => sum + user.sessions, 0);
+
+  const matchCreatedLogs = activityLogs.filter((log) => log.action === 'MATCH_CREATED');
+  const matchesCreatedList = matchCreatedLogs.map((log) => ({
+    label: formatMatchLabel(log.details),
+    username: log.username
+  }));
 
   const interactions = activityLogs.filter((log) => log.action === 'MATCH_INTERACTION');
   const interactionByType = {
@@ -107,6 +168,7 @@ export const buildDailyResumeStats = async (now = new Date()) => {
     player_voted: 0,
     other: 0
   };
+  const interactionsByMatchMap = new Map();
 
   for (const log of interactions) {
     const type = log.details?.type;
@@ -114,30 +176,112 @@ export const buildDailyResumeStats = async (now = new Date()) => {
     else if (type === 'match_rating') interactionByType.match_rating += 1;
     else if (type === 'player_voted') interactionByType.player_voted += 1;
     else interactionByType.other += 1;
+
+    const key = matchKeyFromDetails(log.details || {});
+    const label = formatMatchLabel(log.details || {});
+    if (!interactionsByMatchMap.has(key)) {
+      interactionsByMatchMap.set(key, {
+        label,
+        count: 0,
+        reaction: 0,
+        match_rating: 0,
+        player_voted: 0,
+        other: 0,
+        users: new Set()
+      });
+    }
+    const entry = interactionsByMatchMap.get(key);
+    entry.count += 1;
+    if (type === 'reaction') entry.reaction += 1;
+    else if (type === 'match_rating') entry.match_rating += 1;
+    else if (type === 'player_voted') entry.player_voted += 1;
+    else entry.other += 1;
+    if (log.username) entry.users.add(log.username);
   }
 
+  const interactionsByMatch = [...interactionsByMatchMap.values()]
+    .map((entry) => ({
+      label: entry.label,
+      count: entry.count,
+      reaction: entry.reaction,
+      match_rating: entry.match_rating,
+      player_voted: entry.player_voted,
+      other: entry.other,
+      users: [...entry.users].sort()
+    }))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+
+  const favouriteTeams = activityLogs
+    .filter((log) => log.action === 'ADD_FAVOURITE_TEAM')
+    .map((log) => ({
+      username: log.username,
+      name: log.details?.teamName || `Team ${log.details?.teamId || 'unknown'}`
+    }));
+
+  const favouriteLeagues = activityLogs
+    .filter((log) => log.action === 'ADD_FAVOURITE_LEAGUE')
+    .map((log) => ({
+      username: log.username,
+      name: log.details?.leagueName || `League ${log.details?.leagueId || 'unknown'}`
+    }));
+
   const pageViewCounts = new Map();
+  const pageEntityCounts = {
+    'player-info': new Map(),
+    team: new Map(),
+    'league-detail': new Map()
+  };
+
   for (const log of activityLogs) {
     if (!String(log.action || '').startsWith('VIEW_PAGE_')) continue;
     const page = pageNameFromLog(log);
     pageViewCounts.set(page, (pageViewCounts.get(page) || 0) + 1);
+
+    const details = log.details || {};
+    if (page === 'player-info') {
+      const id = details.playerId != null ? String(details.playerId) : details.playerName;
+      bumpNamedCount(pageEntityCounts['player-info'], id, details.playerName);
+    } else if (page === 'team') {
+      const id = details.teamId != null ? String(details.teamId) : details.teamName;
+      bumpNamedCount(pageEntityCounts.team, id, details.teamName);
+    } else if (page === 'league-detail') {
+      const id = details.leagueId != null ? String(details.leagueId) : details.leagueName;
+      bumpNamedCount(pageEntityCounts['league-detail'], id, details.leagueName);
+    }
   }
 
   const pageViews = [...pageViewCounts.entries()]
-    .map(([page, count]) => ({ page, count }))
+    .map(([page, count]) => {
+      const entityMap = pageEntityCounts[page];
+      const items = entityMap
+        ? [...entityMap.values()]
+            .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name))
+            .map(({ name, count: itemCount }) => ({ name, count: itemCount }))
+        : undefined;
+      return {
+        page,
+        count,
+        ...(items?.length ? { items } : {})
+      };
+    })
     .sort((a, b) => b.count - a.count || a.page.localeCompare(b.page));
 
   const megagoal = {
-    distinctUsers: usersByTimestamp.size,
+    distinctUsers: users.length,
     sessions,
-    matchesCreated: activityLogs.filter((log) => log.action === 'MATCH_CREATED').length,
+    users,
+    matchesCreated: matchCreatedLogs.length,
+    matchesCreatedList,
     matchesDeleted: activityLogs.filter((log) => log.action === 'MATCH_DELETED').length,
     interactions: {
       total: interactions.length,
-      ...interactionByType
+      ...interactionByType,
+      byMatch: interactionsByMatch
     },
-    favouriteTeamsAdded: activityLogs.filter((log) => log.action === 'ADD_FAVOURITE_TEAM').length,
-    favouriteLeaguesAdded: activityLogs.filter((log) => log.action === 'ADD_FAVOURITE_LEAGUE').length,
+    favouriteTeamsAdded: favouriteTeams.length,
+    favouriteLeaguesAdded: favouriteLeagues.length,
+    favouriteTeams,
+    favouriteLeagues,
     feedbackSubmitted: activityLogs.filter((log) => log.action === 'FEEDBACK_SUBMITTED').length,
     pageViews
   };
