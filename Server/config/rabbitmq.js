@@ -116,4 +116,27 @@ export const closeConnection = async () => {
   }
 };
 
-export const isRabbitMQConnected = () => isConnected; 
+export const isRabbitMQConnected = () => isConnected;
+
+export const getChannel = () => channel;
+
+export const publishToQueue = async (queueName, message) => {
+  if (!isConnected || !channel) {
+    throw new Error('RabbitMQ is not connected');
+  }
+
+  await channel.assertQueue(queueName, {
+    durable: true,
+    exclusive: false,
+    autoDelete: false
+  });
+
+  const payload = Buffer.from(JSON.stringify(message));
+  const sent = channel.sendToQueue(queueName, payload, { persistent: true });
+
+  if (!sent) {
+    throw new Error(`Failed to publish message to queue: ${queueName}`);
+  }
+
+  return true;
+}; 

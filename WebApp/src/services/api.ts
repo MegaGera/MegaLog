@@ -51,6 +51,25 @@ export const logsApi = {
     return response.data;
   },
 
+  // Trigger daily resume email job
+  triggerDailyResume: async (): Promise<{
+    ok: boolean;
+    period: { from: string; to: string; label: string };
+    megaauth: {
+      newUsersCount: number;
+      loginsTotal: number;
+      distinctLoginUsers: number;
+    };
+    megagoal: {
+      distinctUsers: number;
+      sessions: number;
+      matchesCreated: number;
+    };
+  }> => {
+    const response = await api.post('/jobs/daily-resume', null, { timeout: 60000 });
+    return response.data;
+  },
+
   // Get filter options
   getFilterOptions: async (): Promise<{
     services: string[];

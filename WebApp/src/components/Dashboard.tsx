@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { Mail, RefreshCw } from 'lucide-react';
 import { logsApi } from '../services/api';
 import { ServiceCard } from './ProjectCard';
 import { StatsCard } from './StatsCard';
@@ -11,7 +11,9 @@ export function Dashboard() {
   const [serviceGroups, setServiceGroups] = useState<ServiceGroup[]>([]);
   const [stats, setStats] = useState<LogsStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [resumeSending, setResumeSending] = useState(false);
   const [error, setError] = useState<string>('');
+  const [resumeMessage, setResumeMessage] = useState<string>('');
 
   useEffect(() => {
     loadInitialData();
@@ -41,6 +43,21 @@ export function Dashboard() {
     await loadInitialData();
   };
 
+  const handleSendDailyResume = async () => {
+    try {
+      setResumeSending(true);
+      setResumeMessage('');
+      setError('');
+      const result = await logsApi.triggerDailyResume();
+      setResumeMessage(`Daily resume queued — ${result.period.label}`);
+    } catch (err) {
+      console.error('Failed to trigger daily resume:', err);
+      setError('Failed to send daily resume. Check MegaLog, MegaQueue, and MegaMail.');
+    } finally {
+      setResumeSending(false);
+    }
+  };
+
   const handleServiceClick = (service: string) => {
     navigate(`/service/${encodeURIComponent(service)}`);
   };
@@ -50,7 +67,6 @@ export function Dashboard() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading MegaLog Dashboard...</p>
         </div>
       </div>
     );
@@ -67,7 +83,19 @@ export function Dashboard() {
               </h1>
             </div>
             
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={handleSendDailyResume}
+                disabled={resumeSending || loading}
+                className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-800 rounded-md hover:bg-gray-50 disabled:opacity-50 shadow-md font-semibold border border-gray-300"
+              >
+                {resumeSending ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Mail className="w-4 h-4" />
+                )}
+                <span>Send daily resume</span>
+              </button>
               <button
                 onClick={handleRefresh}
                 disabled={loading}
@@ -85,6 +113,12 @@ export function Dashboard() {
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
             <p className="text-red-800">{error}</p>
+          </div>
+        )}
+
+        {resumeMessage && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-4 mb-6">
+            <p className="text-green-800">{resumeMessage}</p>
           </div>
         )}
 

@@ -10,8 +10,10 @@ import cookieParser from 'cookie-parser';
 import { connectDB } from './config/db.js';
 import { connect, closeConnection, isRabbitMQConnected } from './config/rabbitmq.js';
 import LogProcessor from './services/logProcessor.js';
+import { startDailyResumeJob, stopDailyResumeJob } from './services/dailyResumeJob.js';
 import logsRouter from './routes/logs.js';
 import statsRouter from './routes/stats.js';
+import jobsRouter from './routes/jobs.js';
 
 console.log('🚀 Starting MegaLog Server...');
 console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -76,6 +78,7 @@ if (process.env.NODE_ENV === 'production') {
 // API Routes
 app.use('/api/logs', logsRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/jobs', jobsRouter);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -124,6 +127,9 @@ const startApplication = async () => {
     
     // Store server reference for graceful shutdown
     app.locals.server = server;
+
+    // Schedule daily resume email (MegaMail sends to ADMIN_EMAIL)
+    startDailyResumeJob();
     
     console.log('✅ MegaLog Server is running!');
     if (rabbitmqConnected) {
@@ -157,6 +163,7 @@ const gracefulShutdown = async (signal) => {
   try {
     // Stop processing new messages
     await logProcessor.stop();
+    stopDailyResumeJob();
     
     // Close HTTP server
     if (app.locals.server) {
